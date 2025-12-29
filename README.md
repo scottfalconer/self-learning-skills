@@ -1,122 +1,186 @@
 # self-learning-skills
 
-This skill is a “sidecar memory” system for agent work:
+**A sidecar memory system that lets AI agents learn from experience.**
 
-- Capture 1–5 durable **Aha Cards** after a task.
-- Generate concrete **recommendations** to improve future runs.
-- Persist learnings locally as append-only JSONL (per-project and optional global).
-- Optionally export **auditable backport bundles** (manifest + markers) you can apply via PR/commit.
+This skill allows agents (Claude Code, GitHub Copilot, Codex, etc.) to **recall** previous solutions and **record** "Aha moments" without modifying their core instructions during a run.
 
-`SKILL.md` is intentionally kept short to reduce agent token cost; this README holds the longer background/setup docs.
+Uniquely, it features a **Backporting Workflow** that lets you "graduate" proven memories into permanent improvements in your other skills (e.g., updating a `database-skill` with a better query pattern you discovered).
 
-## Compatibility
+---
 
-- Works in most filesystem-based Agent Skills implementations (Claude Code, Codex, Copilot Agent, etc.).
-- No network access required.
-- Optional: `python3` to run `scripts/self_learning.py` (stdlib-only helper CLI).
+## ⚡ Quick Start
 
-## Storage model
+### 1) Install (pick the right skills folder for your agent)
 
-All learnings are stored as **append-only JSONL** (one JSON object per line).
+Copy this entire directory into your agent’s **skills directory** as `self-learning-skills/`.
 
-- Project-local store (recommended; gitignored): `<repo-root>/.agent-skills/self-learning/v1/users/<user>/`
-- Global store (optional; cross-project): `~/.agent-skills/self-learning/v1/users/<user>/`
+**Common locations:**
 
-Files (project store):
-- `events.jsonl`
-- `aha_cards.jsonl`
-- `recommendations.jsonl`
-- `signals.jsonl` (usage/reinforcement signals for scoring)
-- `backports.jsonl` (backport exports/applies)
-- `INDEX.md` (best-effort human dashboard; safe to delete/rebuild)
+* **GitHub Copilot Agent:** `.github/skills/self-learning-skills/`
+* **Claude Code (project):** `.claude/skills/self-learning-skills/`
+* **Codex (repo):** `.codex/skills/self-learning-skills/`
 
-## One-time setup (optional)
+> **Note:** The **memory store** is separate from the code.
+> **By default**, it lives under `.agent-skills/` in your repo root (see `references/PORTABILITY.md` for project vs global options).
 
-### A) Initialize storage folders
+---
+
+### 2) Initialize (one time per repo)
+
+Run this from your repository root to create the storage structure and ignore it from version control.
+
+> Replace `<SKILL_DIR>` with the install path from step (1), e.g. `.github/skills/self-learning-skills`.
+> If you're running *this repo directly*, `<SKILL_DIR>` is `.`
 
 ```bash
-python scripts/self_learning.py init
+python3 <SKILL_DIR>/scripts/self_learning.py init --gitignore
+# If python3 isn't available, try:
+# python <SKILL_DIR>/scripts/self_learning.py init --gitignore
 ```
 
-If you can’t run scripts, create the project store folder manually:
-- `.agent-skills/self-learning/v1/users/<user>/`
+* **Creates:** `.agent-skills/self-learning/v1/users/<user>/`
+* **Protects:** Adds `.agent-skills/` to `.gitignore` so you don't commit local memory.
+* **User:** `<user>` is a stable identifier for your local learning stream (see `references/PORTABILITY.md`).
 
-### B) Keep the store out of git
+---
 
-Add `.agent-skills/` to `.gitignore` (the `init` command can do this with `--gitignore`).
+### 3) Integrate (The Policy)
 
-## Integration (no hooks)
+Agents do not automatically "know" to use this skill. You must give them a policy.
 
-Agent Skills don’t have a standard post-run hook mechanism. This skill **does not** modify other skills to “auto-run itself”.
+Copy & paste the block below into your project's main instruction file (e.g., `AGENTS.md`, `CLAUDE.md`, or `.github/copilot-instructions.md`).
 
-To make “run self-learning after tasks” happen consistently, add a small policy block to your repo instruction files:
-- `AGENTS.md` (Codex and others)
-- `CLAUDE.md` (Claude Code)
-- Optional: `.github/copilot-instructions.md`
+> **Self-Learning Policy:**
+>
+> * **Before starting work:** Review prior learnings in `.agent-skills/self-learning/v1/users/<user>/INDEX.md` (or run the `review` command) and apply them to avoid repeating mistakes.
+> * **After finishing work:** If you discovered a reusable pattern, fixed a tricky bug, or have a recommendation for next time, record 1–5 "Aha Cards" (and any Recommendations) using the `record` command.
 
-Templates live in `references/INTEGRATION.md`.
+See [AGENTS.md](AGENTS.md) for advanced configuration.
 
-## Operational usage (CLI)
+---
 
-### Record (post-run)
+## 🛠 Operational Commands (Cheat Sheet)
+
+Run these from your repository root:
+
+### Dashboard (Review)
 
 ```bash
-python scripts/self_learning.py record --json payload.json
+python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
 ```
 
-Payload shape examples and field conventions: `references/FORMAT.md`.
-
-### Recall (pre-run)
+### Find a Memory (Recall)
 
 ```bash
-python scripts/self_learning.py list --query "keywords"
+python3 <SKILL_DIR>/scripts/self_learning.py list --query "pagination"
 ```
 
-### Review (dashboard)
+### Record a Memory (Post-Run)
 
 ```bash
-python scripts/self_learning.py review --days 7
-python scripts/self_learning.py review --days 7 --format json
+python3 <SKILL_DIR>/scripts/self_learning.py record --json payload.json
 ```
 
-### Recommendation lifecycle
+Payload shape examples: [`references/FORMAT.md`](references/FORMAT.md)
+
+### Repair / Normalize Indexes
 
 ```bash
-python scripts/self_learning.py rec-status --id rec_... --status in_progress --note "..."
+python3 <SKILL_DIR>/scripts/self_learning.py repair --apply
 ```
 
-### Store hygiene / repair (append-only)
-
-Backfills missing `primary_skill` (to avoid `null`) and normalizes known status aliases.
+### Recommendation Lifecycle
 
 ```bash
-python scripts/self_learning.py repair --apply
+python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status in_progress --note "working on it"
 ```
 
-## Backports (auditable + reversible)
+---
 
-Backporting is **explicit** and reviewable:
+## 🚀 The Backporting Workflow: "Graduating" Knowledge
+
+Backporting is how you take a proven "Aha Card" and turn it into a permanent improvement in another skill or documentation file.
+
+### The Concept
+
+1. **Discovery:** The agent learns something reusable and records an Aha Card.
+2. **Validation:** You decide it belongs in a real skill, not just local memory.
+3. **Backporting:** You export an auditable bundle (optionally applying it).
+4. **Result:** The target skill is permanently improved, and inserted text is wrapped in **HTML markers** for easy review/removal.
+
+---
+
+### How to Backport
+
+#### 1) Identify Aha Card IDs
 
 ```bash
-python scripts/self_learning.py export-backport --skill-path <skill-dir> --ids aha_1,aha_2 --make-diff
+python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
 ```
 
-The bundle includes:
-- `BACKPORT_MANIFEST.json` (metadata + included Aha IDs)
-- `backport.patch` (optional diff; best-effort)
-
-If you apply the backport (`--apply`), inserted text is marker-wrapped so it’s easy to find/remove:
-- `<!-- self-learning:backport:start id=... --> … <!-- self-learning:backport:end -->`
-- Per-card markers in `references/self-learning-aha.md`
-
-Inspect an existing skill for markers:
+#### 2a) Generate a backport bundle + diff (Dry Run — No Changes)
 
 ```bash
-python scripts/self_learning.py backport-inspect --skill-path <skill-dir>
+python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
+  --skill-path <path-to-target-skill> \
+  --ids aha_123,aha_456 \
+  --make-diff
 ```
 
-## Privacy / safety
+#### 2b) Apply the backport (Writes Changes)
 
-This system is designed for **durable, reusable, non-sensitive** learnings. Avoid storing secrets or private payloads.
+```bash
+python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
+  --skill-path <path-to-target-skill> \
+  --ids aha_123,aha_456 \
+  --apply
+```
 
-Rubric and examples: `references/RUBRIC.md`.
+#### Inspect a target skill for backport markers
+
+```bash
+python3 <SKILL_DIR>/scripts/self_learning.py backport-inspect --skill-path <path-to-target-skill>
+```
+
+---
+
+## 📂 Directory Structure
+
+```text
+self-learning-skills/
+├── SKILL.md
+├── AGENTS.md
+├── README.md
+├── scripts/
+│   └── self_learning.py
+└── references/
+    ├── FORMAT.md
+    ├── RUBRIC.md
+    ├── INTEGRATION.md
+    └── PORTABILITY.md
+```
+
+---
+
+## 🧠 Storage Model
+
+All data is stored in append-only JSONL files within `.agent-skills/self-learning/v1/users/<user>/`.
+
+* **Key Files:**
+
+  * `aha_cards.jsonl`: Durable, reusable knowledge.
+  * `recommendations.jsonl`: Improvements for the next run.
+  * `backports.jsonl`: A log of knowledge "graduated" to code.
+  * `INDEX.md`: Human-readable dashboard (safe to delete/rebuild).
+
+---
+
+## Privacy / Safety
+
+Avoid storing secrets or sensitive payloads in the memory store.
+
+---
+
+## License
+
+MIT
