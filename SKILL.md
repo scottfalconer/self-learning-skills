@@ -1,9 +1,6 @@
 ---
 name: self-learning-skills
-license: MIT
-description: MEMORY sidecar. PRE-RUN recall; POST-RUN record; REVIEW dashboard; optional backport bundles.
-metadata:
-  version: "0.2.0"
+description: "Memory sidecar for agent work: recall before tasks, record learnings after tasks, review recommendations, optional backport bundles."
 ---
 
 # Self-learning sidecar
