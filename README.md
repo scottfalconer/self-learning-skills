@@ -111,8 +111,7 @@ Backporting is how you take a proven "Aha Card" and turn it into a permanent imp
 1. **Discovery:** The agent learns something reusable and records an Aha Card.
 2. **Validation:** You decide it belongs in a real skill, not just local memory.
 3. **Backporting:** You export an auditable bundle (optionally applying it).
-4. **Result:** The target skill is permanently improved, and inserted text is wrapped in **HTML markers** for easy review/removal.
-
+4. **Result:** The target skill is permanently improved.
 ---
 
 ### How to Backport
