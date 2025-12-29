@@ -1,10 +1,17 @@
 # self-learning-skills
 
-**A sidecar memory system that lets AI agents learn from experience.**
+**A simple system to help AI agents learn from their experiences.**
 
-This skill allows agents (Claude Code, GitHub Copilot, Codex, etc.) to **recall** previous solutions and **record** "Aha moments" without modifying their core instructions during a run.
+---
 
-Uniquely, it features a **Backporting Workflow** that lets you "graduate" proven memories into permanent improvements in your other skills (e.g., updating a `database-skill` with a better query pattern you discovered).
+I built self-learning-skills because I noticed my agents often spent time poking around and guessing at things I had already solved in previous runs. I used to manually copy-paste those fixes into future prompts or backport them into my skills.
+
+This repo streamlines that workflow. It acts as a sidecar memory that:
+
+* Stops the guessing: Records "Aha moments" locally so the agent doesn't start from zero next time.
+* Graduates knowledge: Includes a CLI workflow to Backport proven memories into permanent improvements in your actual skills or docs.
+* It works with Claude Code, GitHub Copilot, and Codex and any other system that implements the  https://agentskills.io specification.
+
 
 ---
 
@@ -34,8 +41,6 @@ Run this from your repository root to create the storage structure and ignore it
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py init --gitignore
-# If python3 isn't available, try:
-# python <SKILL_DIR>/scripts/self_learning.py init --gitignore
 ```
 
 * **Creates:** `.agent-skills/self-learning/v1/users/<user>/`
