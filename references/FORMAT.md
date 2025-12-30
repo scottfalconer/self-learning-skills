@@ -35,7 +35,7 @@ Some JSONL files behave like an **event stream**:
 - `id` (string): stable identifier. If omitted, the helper script will create one.
 - `ts` (string): ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). If omitted, helper script fills it.
 - `primary_skill` (string): the skill name involved (use `unknown` if not known)
-- `scope` (string): `project` or `portable`
+- `scope` (string): `project` (repo/run-specific; not a backport target) or `portable` (generally reusable; a backport candidate)
 - `shareable` (boolean): whether it is safe to backport/share
 - `tags` (array of strings): small keywords (`["schema", "jq"]`). Optional convention: include `skill:<name>` to explicitly tag the originating skill (used by `scripts/self_learning.py repair` to backfill missing `primary_skill`).
 

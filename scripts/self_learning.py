@@ -86,6 +86,24 @@ def _normalize_primary_skill(val: Any) -> str:
     return "unknown"
 
 
+VALID_SCOPES = {"project", "portable"}
+
+
+def _normalize_scope(val: Any, *, default: str = "project") -> str:
+    """
+    Normalize scope for Recommendations/Aha Cards.
+
+    Conventions:
+      - project  : specific to the current repo/run; not intended for backport.
+      - portable : generally reusable; a backport candidate.
+    """
+    if isinstance(val, str) and val.strip():
+        scope = val.strip().lower()
+        if scope in VALID_SCOPES:
+            return scope
+    return default
+
+
 def _parse_iso_ts(ts: str) -> Optional[_dt.datetime]:
     """
     Parse ISO 8601 timestamps (supports 'Z' suffix).
@@ -552,6 +570,7 @@ def update_index_md(store: Path) -> None:
                     "id": rid,
                     "title": rec.get("title"),
                     "status": st,
+                    "scope": _normalize_scope(rec.get("scope"), default="project"),
                     "last_touched_ts": lt,
                     "days_since": days_since,
                     "priority": _recommendation_priority(rec),
@@ -571,7 +590,8 @@ def update_index_md(store: Path) -> None:
                     title = r.get("title") or "(untitled)"
                     days = r.get("days_since")
                     days_s = f"{days}d ago" if isinstance(days, int) else "unknown age"
-                    out.append(f"- **{title}** (`{r.get('id')}`, {r.get('status')}, {days_s})")
+                    scope = _normalize_scope(r.get("scope"), default="project")
+                    out.append(f"- **{title}** (`{r.get('id')}`, {r.get('status')}, {scope}, {days_s})")
                 return "\n".join(out)
 
             open_recs_md = _rec_lines(open_recs, 10)
@@ -769,6 +789,7 @@ def cmd_record(args: argparse.Namespace) -> int:
             continue
         obj = dict(x)
         obj["primary_skill"] = _normalize_primary_skill(obj.get("primary_skill") or default_primary_skill)
+        obj["scope"] = _normalize_scope(obj.get("scope"), default="project")
         aha_norm.append(obj)
 
     rec_norm: List[Dict[str, Any]] = []
@@ -777,6 +798,8 @@ def cmd_record(args: argparse.Namespace) -> int:
             continue
         obj = dict(x)
         obj["primary_skill"] = _normalize_primary_skill(obj.get("primary_skill") or default_primary_skill)
+        # Recommendations default to project scope unless explicitly marked portable.
+        obj["scope"] = _normalize_scope(obj.get("scope"), default="project")
         rec_norm.append(obj)
 
     written: Dict[str, str] = {}
@@ -952,6 +975,7 @@ def cmd_rec_status(args: argparse.Namespace) -> int:
     updated["ts"] = now
     updated["status"] = new_status
     updated["last_touched_ts"] = now
+    updated["scope"] = _normalize_scope(args.scope if args.scope else updated.get("scope"), default="project")
     if args.note:
         updated["note"] = str(args.note)
 
@@ -981,12 +1005,14 @@ def cmd_rec_status(args: argparse.Namespace) -> int:
             "ts": current.get("ts"),
             "created_ts": created.get("ts"),
             "title": current.get("title"),
+            "scope": _normalize_scope(current.get("scope"), default="project"),
         },
         "updated": {
             "status": new_status,
             "last_touched_ts": now,
             "ts": now,
             "note": updated.get("note"),
+            "scope": updated.get("scope"),
         },
         "written_to": str(rec_path),
     }, indent=2, ensure_ascii=False))
@@ -1103,6 +1129,7 @@ def cmd_review(args: argparse.Namespace) -> int:
 
     stale_days = max(0, int(args.stale_days))
     skill_filter = str(args.skill).strip() if args.skill else None
+    scope_filter = str(args.scope).strip() if args.scope else None
     query_filter = str(args.query).strip().lower() if args.query else None
     status_filter = [s.strip() for s in (args.status or "").split(",") if s.strip()] if args.status else []
     status_filter_set = set(status_filter)
@@ -1143,6 +1170,8 @@ def cmd_review(args: argparse.Namespace) -> int:
     def _matches_common(obj: Dict[str, Any]) -> bool:
         if skill_filter and str(obj.get("primary_skill") or "") != skill_filter:
             return False
+        if scope_filter and _normalize_scope(obj.get("scope"), default="project") != scope_filter:
+            return False
         if query_filter:
             blob = json.dumps(obj, ensure_ascii=False).lower()
             if query_filter not in blob:
@@ -1176,12 +1205,14 @@ def cmd_review(args: argparse.Namespace) -> int:
         st = _rec_status(rec)
         lt = _rec_last_touched_ts(rec)
         created_ts = str(rec_first.get(rid, {}).get("ts") or "")
+        scope = _normalize_scope(rec.get("scope"), default="project")
         rec_view = {
             "id": rid,
             "title": rec.get("title"),
             "status": st,
             "created_ts": created_ts,
             "last_touched_ts": lt,
+            "scope": scope,
             "priority": _recommendation_priority(rec),
             "expected_impact": rec.get("expected_impact"),
             "primary_skill": rec.get("primary_skill"),
@@ -1286,6 +1317,7 @@ def cmd_review(args: argparse.Namespace) -> int:
             "id": r["id"],
             "title": r.get("title"),
             "status": r.get("status"),
+            "scope": r.get("scope"),
             "why": r.get("why"),
             "suggested_next": "mark in_progress and implement, or reject/deprecate if no longer relevant",
         })
@@ -1307,6 +1339,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         "global_store": (str(global_store) if bool(args.include_global) else None),
         "filters": {
             "skill": skill_filter,
+            "scope": scope_filter,
             "since": (since_dt.isoformat().replace("+00:00", "Z") if since_dt else None),
             "stale_days": stale_days,
             "query": query_filter,
@@ -1316,6 +1349,8 @@ def cmd_review(args: argparse.Namespace) -> int:
             "aha_cards": len(aha_latest),
             "recommendations": len(rec_latest),
             "open_recommendations": len(open_recs),
+            "open_recommendations_project": sum(1 for r in open_recs if r.get("scope") == "project"),
+            "open_recommendations_portable": sum(1 for r in open_recs if r.get("scope") == "portable"),
             "stale_recommendations": len(stale_recs),
             "untouched_recommendations": len(untouched_recs),
             "backport_candidates": len(aha_candidates),
@@ -1351,6 +1386,8 @@ def cmd_review(args: argparse.Namespace) -> int:
         parts: List[str] = ["python", sys.argv[0], "review", "--format", fmt]
         if args.skill:
             parts.extend(["--skill", str(args.skill)])
+        if args.scope:
+            parts.extend(["--scope", str(args.scope)])
         if args.query:
             parts.extend(["--query", str(args.query)])
         if args.status:
@@ -1384,7 +1421,9 @@ def cmd_review(args: argparse.Namespace) -> int:
         "Counts: "
         f"aha={summary.get('aha_cards', 0)}; "
         f"recs={summary.get('recommendations', 0)} "
-        f"(open={summary.get('open_recommendations', 0)}, stale={summary.get('stale_recommendations', 0)}, untouched={summary.get('untouched_recommendations', 0)}); "
+        f"(open={summary.get('open_recommendations', 0)} "
+        f"[project={summary.get('open_recommendations_project', 0)}, portable={summary.get('open_recommendations_portable', 0)}], "
+        f"stale={summary.get('stale_recommendations', 0)}, untouched={summary.get('untouched_recommendations', 0)}); "
         f"backport_candidates={summary.get('backport_candidates', 0)}"
     )
 
@@ -1398,7 +1437,8 @@ def cmd_review(args: argparse.Namespace) -> int:
                 rid = a.get("id")
                 title = a.get("title") or ""
                 st = a.get("status") or ""
-                print(f"- {rid} [{st}] {title}".rstrip())
+                scope = a.get("scope") or "project"
+                print(f"- {rid} [{st}, {scope}] {title}".rstrip())
             elif a.get("type") == "backport_candidate":
                 cid = a.get("id")
                 title = a.get("title") or ""
@@ -2047,6 +2087,11 @@ def build_parser() -> argparse.ArgumentParser:
         choices=sorted(RECOMMENDATION_STATUSES),
         help="New status.",
     )
+    sp_rec_status.add_argument(
+        "--scope",
+        choices=sorted(VALID_SCOPES),
+        help="Optional scope update (project vs portable).",
+    )
     sp_rec_status.add_argument("--note", help="Optional note explaining the change.")
     sp_rec_status.set_defaults(func=cmd_rec_status)
 
@@ -2077,6 +2122,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default: summary). Use 'json' for full machine-readable output.",
     )
     sp_review.add_argument("--skill", help="Filter by primary_skill exact match.")
+    sp_review.add_argument(
+        "--scope",
+        choices=sorted(VALID_SCOPES),
+        help="Filter by scope (project vs portable).",
+    )
     sp_review.add_argument("--query", help="Substring match over JSON blobs.")
     sp_review.add_argument("--status", help="Comma-separated recommendation statuses to include (e.g. proposed,accepted).")
     sp_review.add_argument("--since", help="Only include items touched since this ISO timestamp (e.g. 2025-12-26T00:00:00Z).")

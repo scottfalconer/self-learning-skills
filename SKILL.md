@@ -26,6 +26,7 @@ Critical rule: if no learnings exist (cold start), say so and proceed with stand
 **Action:**
 1. Capture **1–5** Aha Cards (durable, reusable, specific, non-sensitive). Format: `references/FORMAT.md`.
    - Ensure every Aha Card and Recommendation has `primary_skill` (use `unknown` if unsure).
+   - Set `scope` to `project` (repo/run-specific) or `portable` (generally reusable; a backport candidate).
    - If you rediscovered the same learning, treat it as reinforcement (signal) rather than duplicating the full card.
 2. Capture **1–5** concrete recommendations (what to change and where).
 3. Persist:
@@ -39,11 +40,11 @@ Critical rule: if no learnings exist (cold start), say so and proceed with stand
 **Action:**
 - `python scripts/self_learning.py review --days 7`
 - Full JSON: add `--format json`
-- Filters: `--skill <name>`, `--status proposed,accepted,in_progress`, `--query "<keywords>"`
+- Filters: `--skill <name>`, `--scope project|portable`, `--status proposed,accepted,in_progress`, `--query "<keywords>"`
 
 ## 4) MAINTENANCE / Governance
 - Repair store hygiene (append-only): `python scripts/self_learning.py repair --apply`
-- Update recommendation status: `python scripts/self_learning.py rec-status --id rec_... --status done --note "..."`  
+- Update recommendation status/scope: `python scripts/self_learning.py rec-status --id rec_... --status done --scope portable --note "..."`  
 - Optional backport bundle (explicit + auditable): `python scripts/self_learning.py export-backport --skill-path <skill-dir> --ids <aha_ids> [--make-diff] [--apply]`
 - Inspect backport markers in a skill: `python scripts/self_learning.py backport-inspect --skill-path <skill-dir>`
 
