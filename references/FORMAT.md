@@ -39,6 +39,15 @@ Some JSONL files behave like an **event stream**:
 - `shareable` (boolean): whether it is safe to backport/share
 - `tags` (array of strings): small keywords (`["schema", "jq"]`). Optional convention: include `skill:<name>` to explicitly tag the originating skill (used by `scripts/self_learning.py repair` to backfill missing `primary_skill`).
 
+### Writing `portable` entries (generalize without project bleed)
+
+If you set `scope: "portable"`, write the card/recommendation so it reads like a reusable developer note:
+
+- Replace project-specific values with placeholders: `<repo-root>`, `<ENV>`, `<SERVICE>`, `<PROJECT_KEY>`, `<TOKEN>`.
+- Prefer **templates and shapes** over raw payload dumps (field names/types, invariants, error signatures).
+- Avoid absolute paths in `solution_steps`/`evidence` (they will be wrong after backporting).
+- If it’s portable in spirit but still sensitive, keep `scope: "portable"` but set `shareable: false` until you can rewrite safely.
+
 ## Aha Card object (one per line in `aha_cards.jsonl`)
 
 Required (minimum viable):

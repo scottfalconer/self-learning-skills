@@ -19,6 +19,17 @@ It saves time or prevents mistakes in the future:
 - prevents a known failure mode (auth, pagination, parsing, escaping)
 - provides a known-good template for queries/commands
 
+### Reusable across repos?
+
+If the learning applies beyond the current repo (for example, two systems use the same log format), mark it:
+
+- `scope: "portable"` (generalizable)
+- `shareable: true` only if it contains no secrets/PII/project-only context
+
+If it’s only relevant to the current repo/run, keep:
+
+- `scope: "project"`
+
 ## 3) Specific and actionable
 It includes concrete steps:
 - commands, query templates, jq filters, SQL snippets

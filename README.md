@@ -40,11 +40,11 @@ Run this from your repository root to create the storage structure and ignore it
 > If you're running *this repo directly*, `<SKILL_DIR>` is `.`
 
 ```bash
-python3 <SKILL_DIR>/scripts/self_learning.py init --gitignore
+python3 <SKILL_DIR>/scripts/self_learning.py init
 ```
 
 * **Creates:** `.agent-skills/self-learning/v1/users/<user>/`
-* **Protects:** Adds `.agent-skills/` to `.gitignore` so you don't commit local memory.
+* **Protects:** Adds `.agent-skills/` to `.gitignore` so you don't commit local memory (use `--no-gitignore` to skip).
 * **User:** `<user>` is a stable identifier for your local learning stream (see `references/PORTABILITY.md`).
 
 ---
@@ -72,6 +72,7 @@ Run these from your repository root:
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
+python3 <SKILL_DIR>/scripts/self_learning.py review --days 30 --scope portable
 ```
 
 ### Find a Memory (Recall)
@@ -98,6 +99,7 @@ python3 <SKILL_DIR>/scripts/self_learning.py repair --apply
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status in_progress --note "working on it"
+python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status proposed --scope portable --note "Generalized; candidate for reuse/backport"
 ```
 
 ---
@@ -109,9 +111,10 @@ Backporting is how you take a proven "Aha Card" and turn it into a permanent imp
 ### The Concept
 
 1. **Discovery:** The agent learns something reusable and records an Aha Card.
-2. **Validation:** You decide it belongs in a real skill, not just local memory.
-3. **Backporting:** You export an auditable bundle (optionally applying it).
-4. **Result:** The target skill is permanently improved.
+2. **Generalize:** Rewrite it so it doesn’t depend on this repo (set `scope: "portable"` and remove project-only context).
+3. **Validate:** You decide it belongs in a real skill, not just local memory.
+4. **Backport:** You export an auditable bundle (optionally applying it).
+5. **Result:** The target skill is permanently improved.
 ---
 
 ### How to Backport
@@ -120,6 +123,7 @@ Backporting is how you take a proven "Aha Card" and turn it into a permanent imp
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
+python3 <SKILL_DIR>/scripts/self_learning.py review --days 30 --scope portable
 ```
 
 #### 2a) Generate a backport bundle + diff (Dry Run — No Changes)
@@ -176,6 +180,33 @@ All data is stored in append-only JSONL files within `.agent-skills/self-learnin
   * `recommendations.jsonl`: Improvements for the next run.
   * `backports.jsonl`: A log of knowledge "graduated" to code.
   * `INDEX.md`: Human-readable dashboard (safe to delete/rebuild).
+
+---
+
+## 🏷 Scoping: `project` vs `portable`
+
+Each Aha Card and Recommendation can include a `scope` field. This answers:
+
+> “Does this read like a reusable developer tip/trick, or does it require this repo’s context?”
+
+- `project`: specific to the current repo/run (default if omitted)
+- `portable`: generally reusable; a good candidate for backporting into a skill or docs
+
+Important: `scope` is about **content**. Store location (project-local vs global) and the promote/backport lifecycle are covered in `references/PORTABILITY.md`.
+
+Practical workflows:
+
+- Record something reusable by setting `"scope": "portable"` in your `record` payload (see `references/FORMAT.md`).
+- Review only portable items: `python3 <SKILL_DIR>/scripts/self_learning.py review --scope portable --days 30`
+- Reclassify an existing recommendation: `python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status proposed --scope portable --note "..."`.
+
+Portable-writing checklist (avoid leaking full project context):
+
+- Replace repo/environment-specific values with placeholders (`<repo-root>`, `<ENV>`, `<SERVICE>`, `<PROJECT_KEY>`).
+- Prefer shapes/templates/invariants over raw payload dumps.
+- Avoid absolute paths in steps/evidence (they will be wrong after backporting).
+
+Tip: use `shareable: true` only for content that’s safe to persist and potentially backport; never store secrets or sensitive payloads.
 
 ---
 
