@@ -16,6 +16,7 @@ python path/to/self-learning-skills/scripts/self_learning.py repair --apply
 python path/to/self-learning-skills/scripts/self_learning.py rec-status --id rec_... --status in_progress --note "..."
 python path/to/self-learning-skills/scripts/self_learning.py aha-status --id aha_... --status accepted --note "..."
 python path/to/self-learning-skills/scripts/self_learning.py signal --kind aha_used --aha-id aha_... --source manual --context "..."
+python path/to/self-learning-skills/scripts/self_learning.py use --aha aha_...[,aha_...] [--rec rec_...[,rec_...]] [--context "..."]
 python path/to/self-learning-skills/scripts/self_learning.py promote --ids aha_...
 python path/to/self-learning-skills/scripts/self_learning.py export-backport --skill-path <skill-folder> --ids aha_...
 python path/to/self-learning-skills/scripts/self_learning.py backport-inspect --skill-path <skill-folder>

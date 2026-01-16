@@ -10,7 +10,7 @@ This skill writes **append-only JSONL** files.
 ### Global (optional)
 `~/.agent-skills/self-learning/v1/users/<user>/`
 
-The helper script (`scripts/self_learning.py`) supports both.
+The helper script (`<SKILL_DIR>/scripts/self_learning.py`) supports both.
 
 ## Files
 
@@ -37,7 +37,7 @@ Some JSONL files behave like an **event stream**:
 - `primary_skill` (string): the skill name involved (use `unknown` if not known)
 - `scope` (string): `project` (repo/run-specific; not a backport target) or `portable` (generally reusable; a backport candidate)
 - `shareable` (boolean): whether it is safe to backport/share
-- `tags` (array of strings): small keywords (`["schema", "jq"]`). Optional convention: include `skill:<name>` to explicitly tag the originating skill (used by `scripts/self_learning.py repair` to backfill missing `primary_skill`).
+- `tags` (array of strings): small keywords (`["schema", "jq"]`). Optional convention: include `skill:<name>` to explicitly tag the originating skill (used by `python3 <SKILL_DIR>/scripts/self_learning.py repair` to backfill missing `primary_skill`).
 
 ### Writing `portable` entries (generalize without project bleed)
 
@@ -166,7 +166,16 @@ Minimum viable:
 `kind` values (current):
 
 - `aha_used`, `aha_recalled`, `aha_reinforced`, `aha_promoted`, `aha_backported`
-- `rec_touched`, `rec_done`
+- `rec_used`, `rec_touched`, `rec_done`
+
+Helper CLI conveniences:
+
+- `python3 <SKILL_DIR>/scripts/self_learning.py use --aha aha_...[,aha_...] [--rec rec_...[,rec_...]]` appends `aha_used` / `rec_used` signals.
+- `python3 <SKILL_DIR>/scripts/self_learning.py record` also supports optional keys to auto-append usage signals:
+  - `used_aha_ids`: array of `aha_...` ids (or comma-separated string)
+  - `used_rec_ids`: array of `rec_...` ids (or comma-separated string)
+  - `used`: `{ "aha_ids": [...], "rec_ids": [...] }` (alternative shape)
+  - `usage_source`, `usage_context`: optional metadata for the generated signals
 
 ## Redaction and safety
 

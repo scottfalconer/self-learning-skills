@@ -55,6 +55,7 @@ SIGNAL_KINDS = {
     "aha_reinforced",
     "aha_promoted",
     "aha_backported",
+    "rec_used",
     "rec_touched",
     "rec_done",
 }
@@ -84,6 +85,40 @@ def _normalize_primary_skill(val: Any) -> str:
             s = s.split()[0].strip()
         return s or "unknown"
     return "unknown"
+
+
+def _parse_id_list(val: Any, *, allow_empty: bool = True) -> List[str]:
+    """
+    Parse a list of ids from either:
+      - a JSON array of strings
+      - a comma-separated string ("aha_...,aha_...")
+    Returns de-duped ids preserving order.
+    """
+    if val is None:
+        return []
+    parts: List[str] = []
+    if isinstance(val, str):
+        parts = [x.strip() for x in val.split(",") if x.strip()]
+    elif isinstance(val, list):
+        for x in val:
+            if x is None:
+                continue
+            if isinstance(x, str) and x.strip():
+                parts.append(x.strip())
+    else:
+        raise TypeError("Expected a list of strings or a comma-separated string")
+
+    out: List[str] = []
+    seen: set[str] = set()
+    for x in parts:
+        if x in seen:
+            continue
+        seen.add(x)
+        out.append(x)
+
+    if not out and not allow_empty:
+        raise ValueError("Expected at least one id")
+    return out
 
 
 VALID_SCOPES = {"project", "portable"}
@@ -748,6 +783,11 @@ def cmd_record(args: argparse.Namespace) -> int:
     event = payload.get("event")
     aha_cards = payload.get("aha_cards", [])
     recs = payload.get("recommendations", [])
+    used_aha_ids_raw = payload.get("used_aha_ids")
+    used_rec_ids_raw = payload.get("used_rec_ids")
+    used_obj = payload.get("used") if isinstance(payload.get("used"), dict) else {}
+    usage_source = payload.get("usage_source")
+    usage_context = payload.get("usage_context")
 
     if event is not None and not isinstance(event, dict):
         raise SystemExit("'event' must be a JSON object if provided.")
@@ -755,6 +795,14 @@ def cmd_record(args: argparse.Namespace) -> int:
         raise SystemExit("'aha_cards' must be an array.")
     if not isinstance(recs, list):
         raise SystemExit("'recommendations' must be an array.")
+
+    try:
+        used_aha_ids = _parse_id_list(used_aha_ids_raw)
+        used_rec_ids = _parse_id_list(used_rec_ids_raw)
+        used_aha_ids += _parse_id_list(used_obj.get("aha_ids"))
+        used_rec_ids += _parse_id_list(used_obj.get("rec_ids"))
+    except Exception as e:
+        raise SystemExit(f"Invalid used ids in payload: {e}")
 
     # Redact first.
     event_r = redact(event) if event else None
@@ -808,6 +856,9 @@ def cmd_record(args: argparse.Namespace) -> int:
         e = _normalize_event(event_r)
         append_jsonl(store / "events.jsonl", e)
         written["events"] = str(store / "events.jsonl")
+        # Prefer a stable event id for usage signal context.
+        if not usage_context:
+            usage_context = f"event_id={e.get('id')}"
 
     if aha_norm:
         existing_lines = read_jsonl(store / "aha_cards.jsonl")
@@ -890,6 +941,38 @@ def cmd_record(args: argparse.Namespace) -> int:
             append_jsonl(store / "recommendations.jsonl", redact(r))
         written["recommendations"] = str(store / "recommendations.jsonl")
 
+    usage_signals: Dict[str, Any] = {"written": [], "invalid_ids": [], "errors": []}
+    try:
+        # De-dupe while preserving order (and ignore blanks).
+        used_aha_ids = _parse_id_list(used_aha_ids)
+        used_rec_ids = _parse_id_list(used_rec_ids)
+        source = str(usage_source or "agent").strip() or "agent"
+        context = str(usage_context).strip() if isinstance(usage_context, str) and usage_context.strip() else None
+
+        for cid in used_aha_ids:
+            if not str(cid).startswith("aha_"):
+                usage_signals["invalid_ids"].append({"id": cid, "expected_prefix": "aha_"})
+                continue
+            try:
+                usage_signals["written"].append(
+                    append_signal(store, kind="aha_used", aha_id=str(cid), source=source, context=context)
+                )
+            except Exception as exc:
+                usage_signals["errors"].append({"id": cid, "error": str(exc)})
+
+        for rid in used_rec_ids:
+            if not str(rid).startswith("rec_"):
+                usage_signals["invalid_ids"].append({"id": rid, "expected_prefix": "rec_"})
+                continue
+            try:
+                usage_signals["written"].append(
+                    append_signal(store, kind="rec_used", rec_id=str(rid), source=source, context=context)
+                )
+            except Exception as exc:
+                usage_signals["errors"].append({"id": rid, "error": str(exc)})
+    except Exception as exc:
+        usage_signals["errors"].append({"error": str(exc)})
+
     try:
         update_index_md(store)
     except Exception:
@@ -901,6 +984,7 @@ def cmd_record(args: argparse.Namespace) -> int:
         "user": user,
         "project_store": str(store),
         "written": written,
+        "usage_signals": usage_signals,
     }, indent=2))
     return 0
 
@@ -1048,6 +1132,64 @@ def cmd_signal(args: argparse.Namespace) -> int:
         "project_store": str(store),
         "written_to": str(store / "signals.jsonl"),
         "signal": rec,
+    }, indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_use(args: argparse.Namespace) -> int:
+    """
+    Convenience helper to mark existing learnings as "used" (writes to signals.jsonl).
+    This avoids having to call `signal` repeatedly.
+    """
+    user = safe_user_slug()
+    repo = find_repo_root()
+    store = project_store_dir(repo, user)
+    ensure_store_dirs(store)
+
+    aha_ids = _parse_id_list(args.aha_ids) if args.aha_ids else []
+    rec_ids = _parse_id_list(args.rec_ids) if args.rec_ids else []
+    if not aha_ids and not rec_ids:
+        raise SystemExit("Provide --aha <aha_...[,aha_...]> and/or --rec <rec_...[,rec_...]>" )
+
+    source = str(args.source or "agent").strip() or "agent"
+    context = str(args.context).strip() if args.context else None
+
+    written: List[Dict[str, Any]] = []
+    invalid: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+
+    for cid in aha_ids:
+        if not str(cid).startswith("aha_"):
+            invalid.append({"id": cid, "expected_prefix": "aha_"})
+            continue
+        try:
+            written.append(append_signal(store, kind="aha_used", aha_id=str(cid), source=source, context=context))
+        except Exception as exc:
+            errors.append({"id": cid, "error": str(exc)})
+
+    for rid in rec_ids:
+        if not str(rid).startswith("rec_"):
+            invalid.append({"id": rid, "expected_prefix": "rec_"})
+            continue
+        try:
+            written.append(append_signal(store, kind="rec_used", rec_id=str(rid), source=source, context=context))
+        except Exception as exc:
+            errors.append({"id": rid, "error": str(exc)})
+
+    try:
+        update_index_md(store)
+    except Exception:
+        pass
+
+    print(json.dumps({
+        "ok": True,
+        "repo_root": str(repo),
+        "user": user,
+        "project_store": str(store),
+        "written_to": str(store / "signals.jsonl"),
+        "signals_written": written,
+        "invalid_ids": invalid,
+        "errors": errors,
     }, indent=2, ensure_ascii=False))
     return 0
 
@@ -1297,7 +1439,7 @@ def cmd_review(args: argparse.Namespace) -> int:
             "explain": bd["explain"],
             "tags": tags,
             "artifact_suggestion": artifact,
-            "how_to_backport": f"python scripts/self_learning.py export-backport --skill-path <target-skill-dir> --ids {cid} --make-diff",
+            "how_to_backport": f"python3 <SKILL_DIR>/scripts/self_learning.py export-backport --skill-path <target-skill-dir> --ids {cid} --make-diff",
         })
 
     aha_candidates.sort(key=lambda x: (int(x.get("score") or 0), str(x.get("title") or "")), reverse=True)
@@ -2102,6 +2244,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp_signal.add_argument("--source", default="manual", help="Source of the signal (default: manual).")
     sp_signal.add_argument("--context", help="Optional short context (avoid secrets).")
     sp_signal.set_defaults(func=cmd_signal)
+
+    sp_use = sub.add_parser("use", help="Mark an Aha Card / Recommendation as used (writes signals).")
+    sp_use.add_argument("--aha", dest="aha_ids", help="Comma-separated Aha Card ids (aha_...[,aha_...]).")
+    sp_use.add_argument("--rec", dest="rec_ids", help="Comma-separated Recommendation ids (rec_...[,rec_...]).")
+    sp_use.add_argument("--source", default="agent", help="Source of the usage signal (default: agent).")
+    sp_use.add_argument("--context", help="Optional short context (avoid secrets).")
+    sp_use.set_defaults(func=cmd_use)
 
     sp_aha_status = sub.add_parser("aha-status", help="Update an Aha Card status (append-only, auditable).")
     sp_aha_status.add_argument("--id", required=True, help="Aha Card id (aha_...).")
