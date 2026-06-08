@@ -1,0 +1,6 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local per-user agent memory store
+.agents/memory/

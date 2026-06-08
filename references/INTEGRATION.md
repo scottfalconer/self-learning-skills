@@ -18,7 +18,7 @@ Add a small “Self-learning policy” section:
 ## Self-learning policy (sidecar skill)
 
 ### Before starting work
-- If present, skim `.agent-skills/self-learning/v1/users/<user>/INDEX.md` (or `aha_cards.jsonl`) for relevant Aha Cards.
+- If present, skim `.agents/memory/self-learning/v1/users/<user>/INDEX.md` (or `aha_cards.jsonl`) for relevant Aha Cards.
 
 ### After finishing work
 - Run the `self-learning-skills` skill to capture:
@@ -34,7 +34,7 @@ Keep it short so it’s always carried into context:
 # Repo guidance
 
 Follow the Self-learning policy:
-- Before starting: skim `.agent-skills/self-learning/v1/users/<user>/INDEX.md` if present.
+- Before starting: skim `.agents/memory/self-learning/v1/users/<user>/INDEX.md` if present.
 - After finishing: run the `self-learning-skills` skill.
 
 (If `AGENTS.md` exists, treat it as canonical for details.)
@@ -47,13 +47,13 @@ If you use Copilot/VS Code instruction files:
 ```md
 Follow `AGENTS.md` repository guidance.
 
-- Before starting: skim `.agent-skills/self-learning/v1/users/<user>/INDEX.md` if present.
+- Before starting: skim `.agents/memory/self-learning/v1/users/<user>/INDEX.md` if present.
 - After finishing any non-trivial task: run the `self-learning-skills` skill.
 ```
 
 ## Notes
 
-- Keep `.agent-skills/` in `.gitignore` if you don’t want these learnings committed.
+- Keep `.agents/memory/` in `.gitignore` if you don’t want these learnings committed.
 - This is **policy-based** (instructions), not a runtime guarantee; it’s still the most portable way to get consistent pre/post behavior across different agent tools.
 
 ## If you previously used hooks

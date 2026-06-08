@@ -24,7 +24,7 @@ python path/to/self-learning-skills/scripts/self_learning.py backport-inspect --
 
 Notes:
 
-- `export-backport` writes a bundle under `.agent-skills/self-learning/v1/users/<user>/exports/backports/` including `BACKPORT_MANIFEST.json`, and appends a provenance entry to `backports.jsonl`.
+- `export-backport` writes a bundle under `.agents/memory/self-learning/v1/users/<user>/exports/backports/` including `BACKPORT_MANIFEST.json`, and appends a provenance entry to `backports.jsonl`.
 - `review` defaults to a compact summary. Use `--format json` for full machine-readable output.
 - `repair --apply` backfills missing `primary_skill` values and normalizes common status aliases (append-only).
 
