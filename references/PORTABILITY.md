@@ -16,21 +16,41 @@ Store location is about **filesystem paths**, not whether something is generaliz
 
 Best for: anything you discover while working in this repo (including items you may later generalize).
 
-Path:
+Default path:
 
-`<repo-root>/.agent-skills/self-learning/v1/users/<user>/`
+`<repo-root>/.agents/memory/self-learning/v1/users/<user>/`
+
+Override with the `SELF_LEARNING_PROJECT_DIR` env var to use a different base directory:
+
+```bash
+SELF_LEARNING_PROJECT_DIR=/custom/path python3 <SKILL_DIR>/scripts/self_learning.py review
+```
 
 ### Global store (optional)
 
 Best for: items you want to recall across many repos (usually **portable + shareable** items).
 
-Path:
+Default path:
 
-`~/.agent-skills/self-learning/v1/users/<user>/`
+`~/.agents/memory/self-learning/v1/users/<user>/`
+
+Override with the `SELF_LEARNING_GLOBAL_DIR` env var:
+
+```bash
+SELF_LEARNING_GLOBAL_DIR=/shared/memory python3 <SKILL_DIR>/scripts/self_learning.py promote --ids aha_123
+```
 
 Notes:
 - The global store is optional; most workflows start in the project store.
 - You still need policy/instructions if you want agents to consult the global store.
+
+### Other env vars
+
+| Variable | Purpose |
+|---|---|
+| `SELF_LEARNING_REPO_ROOT` | Override repo root detection (useful in CI or non-standard layouts) |
+| `SELF_LEARNING_PROJECT_DIR` | Override the project store base directory |
+| `SELF_LEARNING_GLOBAL_DIR` | Override the global store path entirely |
 
 ## 2) Content scope (`scope` field)
 

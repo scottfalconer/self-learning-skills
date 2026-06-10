@@ -28,7 +28,7 @@ Copy this entire directory into your agent’s **skills directory** as `self-lea
 * **Codex (repo):** `.codex/skills/self-learning-skills/`
 
 > **Note:** The **memory store** is separate from the code.
-> **By default**, it lives under `.agent-skills/` in your repo root (see `references/PORTABILITY.md` for project vs global options).
+> **By default**, it lives under `.agents/memory/` in your repo root. Both paths are configurable via env vars (see `references/PORTABILITY.md`).
 
 ---
 
@@ -43,8 +43,8 @@ Run this from your repository root to create the storage structure and ignore it
 python3 <SKILL_DIR>/scripts/self_learning.py init
 ```
 
-* **Creates:** `.agent-skills/self-learning/v1/users/<user>/`
-* **Protects:** Adds `.agent-skills/` to `.gitignore` so you don't commit local memory (use `--no-gitignore` to skip).
+* **Creates:** `.agents/memory/self-learning/v1/users/<user>/`
+* **Protects:** Adds `.agents/memory/` to `.gitignore` so you don't commit local memory (use `--no-gitignore` to skip).
 * **User:** `<user>` is a stable identifier for your local learning stream (see `references/PORTABILITY.md`).
 
 ---
@@ -57,7 +57,7 @@ Copy & paste the block below into your project's main instruction file (e.g., `A
 
 > **Self-Learning Policy:**
 >
-> * **Before starting work:** Review prior learnings in `.agent-skills/self-learning/v1/users/<user>/INDEX.md` (or run the `review` command) and apply them to avoid repeating mistakes.
+> * **Before starting work:** Review prior learnings in `.agents/memory/self-learning/v1/users/<user>/INDEX.md` (or run the `review` command) and apply them to avoid repeating mistakes.
 > * **After finishing work:** If you discovered a reusable pattern, fixed a tricky bug, or have a recommendation for next time, record 1–5 "Aha Cards" (and any Recommendations) using the `record` command.
 
 See [AGENTS.md](AGENTS.md) for advanced configuration.
@@ -172,7 +172,7 @@ self-learning-skills/
 
 ## 🧠 Storage Model
 
-All data is stored in append-only JSONL files within `.agent-skills/self-learning/v1/users/<user>/`.
+All data is stored in append-only JSONL files within `.agents/memory/self-learning/v1/users/<user>/`.
 
 * **Key Files:**
 

@@ -5,10 +5,10 @@ This skill writes **append-only JSONL** files.
 ## Default store locations
 
 ### Project-local (recommended)
-`<repo-root>/.agent-skills/self-learning/v1/users/<user>/`
+`<repo-root>/.agents/memory/self-learning/v1/users/<user>/`
 
 ### Global (optional)
-`~/.agent-skills/self-learning/v1/users/<user>/`
+`~/.agents/memory/self-learning/v1/users/<user>/`
 
 The helper script (`<SKILL_DIR>/scripts/self_learning.py`) supports both.
 
@@ -143,7 +143,7 @@ Minimum viable:
   "added_card_ids": ["aha_..."],
   "result_card_ids": ["aha_..."],
   "applied": true,
-  "bundle_dir": "/path/to/.agent-skills/.../exports/backports/example-skill_slbp_..."
+  "bundle_dir": "/path/to/.agents/memory/.../exports/backports/example-skill_slbp_..."
 }
 ```
 

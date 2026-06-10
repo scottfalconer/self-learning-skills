@@ -31,7 +31,7 @@ Safety and fallback: If a skill can't be applied cleanly (missing files, unclear
 ## Self-learning policy (sidecar skill)
 
 ### Before starting work
-- If present, skim `.agent-skills/self-learning/v1/users/<user>/INDEX.md` (or `aha_cards.jsonl`) for relevant Aha Cards.
+- If present, skim `.agents/memory/self-learning/v1/users/<user>/INDEX.md` (or `aha_cards.jsonl`) for relevant Aha Cards.
 
 ### After finishing work
 - Run the `self-learning-skills` skill to capture:

@@ -20,7 +20,7 @@ This skill ships an optional helper CLI at `<SKILL_DIR>/scripts/self_learning.py
 **When to use:** Before any non-trivial task.
 
 **Action:**
-1. Locate the project store: `<repo-root>/.agent-skills/self-learning/v1/users/<user>/`
+1. Locate the project store: `<repo-root>/.agents/memory/self-learning/v1/users/<user>/`
 2. Read `<project_store>/INDEX.md` (quick skim).
 3. If you need targeted recall, run:
    - `python3 <SKILL_DIR>/scripts/self_learning.py list --query "<keywords>"`

@@ -376,15 +376,21 @@ def find_repo_root() -> Path:
     return cwd
 
 
+STORE_DIRNAME = ".agents/memory"
+
+
 def project_store_dir(repo_root: Path, user: str) -> Path:
-    return repo_root / ".agent-skills" / "self-learning" / "v1" / "users" / user
+    env = os.environ.get("SELF_LEARNING_PROJECT_DIR")
+    if env:
+        return Path(env).expanduser().resolve() / "self-learning" / "v1" / "users" / user
+    return repo_root / STORE_DIRNAME / "self-learning" / "v1" / "users" / user
 
 
 def global_store_dir(user: str) -> Path:
     env = os.environ.get("SELF_LEARNING_GLOBAL_DIR")
     if env:
         return Path(env).expanduser().resolve()
-    return Path.home() / ".agent-skills" / "self-learning" / "v1" / "users" / user
+    return Path.home() / STORE_DIRNAME / "self-learning" / "v1" / "users" / user
 
 
 def ensure_store_dirs(store: Path) -> None:
@@ -716,16 +722,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     store = project_store_dir(repo, user)
     ensure_store_dirs(store)
 
-    # Ensure gitignore contains .agent-skills/
+    # Ensure gitignore contains .agents/memory/
     if args.gitignore:
         gi = repo / ".gitignore"
         try:
             existing = gi.read_text(encoding="utf-8") if gi.exists() else ""
-            if ".agent-skills/" not in existing:
+            if ".agents/memory/" not in existing:
                 with gi.open("a", encoding="utf-8") as f:
                     if existing and not existing.endswith("\n"):
                         f.write("\n")
-                    f.write("\n# Local per-user agent skill memory\n.agent-skills/\n")
+                    f.write("\n# Local per-user agent memory store\n.agents/memory/\n")
         except Exception:
             # Don't fail init if gitignore isn't writable.
             pass
@@ -735,7 +741,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         "user": user,
         "project_store": str(store),
         "global_store": str(global_store_dir(user)),
-        "note": "Project store created. Add .agent-skills/ to .gitignore if you haven't."
+        "note": "Project store created. Add .agents/memory/ to .gitignore if you haven't."
     }, indent=2))
     return 0
 
