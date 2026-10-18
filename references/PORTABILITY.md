@@ -1,138 +1,120 @@
-# Portability & scope: store location vs content scope
+# Storage and portability
 
-This skill has a few related concepts that are easy to mix up:
+Storage location, content scope, and sharing are separate properties. A portable card can remain in a project store. A global store does not make its contents safe for publication.
 
-1) **Store location**: where the JSONL files live (project-local vs global)
-2) **Content scope**: how general a card/recommendation is (`scope: project|portable`)
-3) **Sharing mechanism**: promote (personal) vs backport (shared)
+## Store locations
 
-Keeping these separate is what lets you capture broadly useful “developer tips/tricks” without dragging full project context along.
+The default project store is:
 
-## 1) Store location (where memory lives)
-
-Store location is about **filesystem paths**, not whether something is generalizable.
-
-### Project store (default)
-
-Best for: anything you discover while working in this repo (including items you may later generalize).
-
-Default path:
-
-`<repo-root>/.agents/memory/self-learning/v1/users/<user>/`
-
-Override with the `SELF_LEARNING_PROJECT_DIR` env var to use a different base directory:
-
-```bash
-SELF_LEARNING_PROJECT_DIR=/custom/path python3 <SKILL_DIR>/scripts/self_learning.py review
+```text
+<repo-root>/.agents/memory/self-learning/v1/users/<user>/
 ```
 
-### Global store (optional)
+The optional global store is:
 
-Best for: items you want to recall across many repos (usually **portable + shareable** items).
-
-Default path:
-
-`~/.agents/memory/self-learning/v1/users/<user>/`
-
-Override with the `SELF_LEARNING_GLOBAL_DIR` env var:
-
-```bash
-SELF_LEARNING_GLOBAL_DIR=/shared/memory python3 <SKILL_DIR>/scripts/self_learning.py promote --ids aha_123
+```text
+~/.agents/memory/self-learning/v1/users/<user>/
 ```
 
-Notes:
-- The global store is optional; most workflows start in the project store.
-- You still need policy/instructions if you want agents to consult the global store.
+The CLI derives `<user>` from `USER`, then `USERNAME`, with `default` as the fallback. It removes the email domain and replaces characters that are not safe for a filename.
 
-### Other env vars
+Run the CLI from the intended project. By default, it searches parent directories for `.git`. Use `SELF_LEARNING_REPO_ROOT` when automatic detection does not identify the intended root.
 
-| Variable | Purpose |
-|---|---|
-| `SELF_LEARNING_REPO_ROOT` | Override repo root detection (useful in CI or non-standard layouts) |
-| `SELF_LEARNING_PROJECT_DIR` | Override the project store base directory |
-| `SELF_LEARNING_GLOBAL_DIR` | Override the global store path entirely |
+| Variable | Effect |
+| --- | --- |
+| `SELF_LEARNING_REPO_ROOT` | Sets the repository root. |
+| `SELF_LEARNING_PROJECT_DIR` | Sets the project memory base directory. The CLI adds `self-learning/v1/users/<user>/`. |
+| `SELF_LEARNING_GLOBAL_DIR` | Sets the complete global store path. The CLI adds no suffix. |
 
-## 2) Content scope (`scope` field)
+For example, this command reads `<repo-root>/.local-memory/self-learning/v1/users/<user>/`:
 
-Content scope is a field on **Aha Cards** and **Recommendations** (see `references/FORMAT.md`).
+```bash
+SELF_LEARNING_PROJECT_DIR=.local-memory \
+  python3 <SKILL_DIR>/scripts/self_learning.py review
+```
 
-- `project`: depends on this repo/run; keep local; not a backport target
-- `portable`: expressed generically; could apply in other repos; candidate for promote/backport
+The example assumes that the current directory is the project root. Relative overrides resolve from the current directory.
 
-### Portable-writing checklist (avoid leaking full project context)
+`init` adds an ignore rule for a project memory base inside the repository. An external memory directory needs separate ignore or access controls. Use `--no-gitignore` to manage ignore rules yourself.
 
-If you mark something `portable`, write it so it reads like a reusable developer note:
+The `list` and `review` commands read the project store. `review --include-global` adds global store counts. It does not search global card contents. To recall global cards, read the global store's `INDEX.md` or JSONL file.
 
-- Remove customer names, one-off ticket IDs, and one-time incident details unless they are part of a reusable lookup pattern.
-- Prefer **templates and shapes** over raw payload dumps (field names/types, invariants, error signatures).
-- Replace environment-specific values with placeholders: `<repo-root>`, `<PROJECT_KEY>`, `<SERVICE>`, `<ENV>`, `<TOKEN>`.
-- Avoid absolute paths in steps/evidence; prefer relative paths or `<repo-root>/...`.
+## Content scope
 
-If it’s a generally useful idea but contains sensitive/project-specific details, keep the scope intent (`portable`) but set `shareable: false` until you can rewrite safely.
+Use `scope: "project"` when a card depends on one project. Use `scope: "portable"` when its content is applicable to other projects.
 
-## 3) Promote (project store → global store)
+Before you classify a card as portable:
 
-Promotion copies selected Aha Cards from your **project store** to your **global store** for personal cross-repo recall:
+1. Remove customer names and private data.
+2. Replace environment values with placeholders.
+3. Keep the conditions that affect the result.
+4. Use source references that another reader can access.
+5. Set `shareable: true` only when the content is safe to share.
+
+To share revised private content, create a separate card. Refer to [Aha Card updates](FORMAT.md#aha-cards) for restrictions.
+
+These fields classify the content. They do not authorize writes to a global store, edits to another skill, or publication.
+
+## Copy cards to the global store
+
+Use this command when the user authorizes personal memory across projects:
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py promote --ids aha_123,aha_456
 ```
 
-Notes:
-- Promotion does **not** change any skills; it just copies cards.
-- The CLI will set `scope` to `portable` if it’s missing, but you’re still responsible for making the content actually portable and safe (`shareable: true`).
+The command copies selected Aha Cards to the global store. It also writes signals to the project store. It does not change skill files. It skips IDs that already exist in the global store. It does not update those global copies.
 
-## 4) Backport (memory → skill)
+Every selected card must have `scope: "portable"` and `shareable: true`. The command uses each card's latest record. If an ID is missing, the command fails before it copies cards.
 
-Backporting is how you “graduate” a proven Aha into a skill so the knowledge travels with the skill when shared.
+Examine a card before you copy it. Do not copy rejected or deprecated results without a new examination of their source data.
 
-Good backport targets:
-- `references/…` files (schemas, templates, examples)
-- clearer steps in the skill’s `SKILL.md`
-- small deterministic helpers in `scripts/…`
+## Backport to a skill
 
-Generate a backport bundle (recommended first):
+A backport puts selected cards in `references/self-learning-aha.md` inside a target skill. It adds a marked reference block to the target's `SKILL.md`.
+
+The CLI requires `scope: "portable"` and `shareable: true` for every selected card. These fields do not prove that a card is correct.
+
+To prepare a backport:
+
+1. Make sure that the card still agrees with the current code or documentation.
+2. Make sure that the target skill needs this information.
+3. Create a bundle with a patch:
+
+   ```bash
+   python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
+     --skill-path <target-skill-dir> \
+     --ids aha_123,aha_456 \
+     --make-diff
+   ```
+
+4. Examine the manifest and patch in the reported bundle directory.
+5. If target edits are authorized, apply the changes:
+
+   ```bash
+   python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
+     --skill-path <target-skill-dir> \
+     --ids aha_123,aha_456 \
+     --apply
+   ```
+
+6. Examine the changed target files.
+
+An export without `--apply` still writes files. It creates a bundle under `<project-store>/exports/backports/` and adds an entry to `backports.jsonl`. The target skill stays unchanged.
+
+The bundle contains a manifest, a reference file, and a `SKILL_APPEND.md` snippet. `--make-diff` also writes `backport.patch`. `--apply` writes the target files and records the apply operation.
+
+## Examine or remove a backport
+
+To find backport markers, run this command:
 
 ```bash
-python3 <SKILL_DIR>/scripts/self_learning.py export-backport --skill-path <skill-dir> --ids aha_123 --make-diff
+python3 <SKILL_DIR>/scripts/self_learning.py backport-inspect --skill-path <target-skill-dir>
 ```
 
-Apply directly (writes changes):
+The target uses these markers:
 
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py export-backport --skill-path <skill-dir> --ids aha_123 --apply
-```
+- `self-learning:backport:start` and `self-learning:backport:end` in `SKILL.md`
+- `self-learning:aha:start` and `self-learning:aha:end` around each card in the reference file
 
-Recommended criteria before backporting:
-- `scope: portable`
-- `shareable: true`
-- durable/repeatable (see `references/RUBRIC.md`)
-
-## 5) Auditable and reversible backports
-
-Backport bundles are designed to be easy to review and undo:
-
-- Bundles include `BACKPORT_MANIFEST.json` describing the backport id, selected card ids, and intended changes.
-- `SKILL.md` snippets are wrapped in `<!-- self-learning:backport:start ... -->` / `<!-- self-learning:backport:end -->`.
-- Backported Aha Cards in `references/self-learning-aha.md` are wrapped per card with `<!-- self-learning:aha:start ... -->` / `<!-- self-learning:aha:end -->`.
-- The local store records each export/apply in `backports.jsonl`.
-
-Removal options:
-- Prefer reverting the commit/PR that applied the backport.
-- Otherwise delete the marker-wrapped blocks (and/or remove individual Aha Card blocks).
-
-Optional helper:
-
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py backport-inspect --skill-path <skill-dir>
-```
-
-## Safety / privacy rules
-
-Before promoting or backporting:
-- remove secrets (keys, tokens, passwords, cookies)
-- avoid raw customer data and PII
-- keep examples synthetic or redacted
-- prefer recording **shape** over values
-
-If you can’t make it safe, keep it in the project store and set `shareable: false`.
+To remove a backport, first examine the current target changes. If the backport has a separate commit, a revert can remove it. Otherwise, remove only the applicable marked blocks after authorization. Do not overwrite later edits.

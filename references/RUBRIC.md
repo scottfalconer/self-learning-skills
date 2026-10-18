@@ -1,85 +1,53 @@
-# Aha Moment Rubric
+# Capture criteria
 
-Use this rubric after completing a task (or a skill run) to decide what is worth saving.
+Record a result when it can help a later task. A useful card states a problem, a tested solution, and the conditions for use.
 
-An “aha” is worth recording if it meets **all** of these:
+## Select a result
 
-## 1) Durable
-It is likely to stay true for a while:
-- stable API behavior
-- stable log/event fields
-- consistent file formats
-- repeatable command/query patterns
+Prefer results that required investigation. Examples include:
 
-Avoid saving one-off coincidences.
+- A data format with required fields and known limits
+- A command sequence that solved a repeatable failure
+- An interface condition that a caller must satisfy
+- A failed method and the conditions that caused its failure
+- A shorter procedure with the same observed result
 
-## 2) Reusable
-It saves time or prevents mistakes in the future:
-- removes repeated exploration (sampling, guessing field names, trial-and-error)
-- prevents a known failure mode (auth, pagination, parsing, escaping)
-- provides a known-good template for queries/commands
+Keep the card small enough to use without reading a full transcript. If no result meets these criteria, do not create a card.
 
-### Reusable across repos?
+## Record source data
 
-If the learning applies beyond the current repo (for example, two systems use the same log format), mark it:
+Identify the source that supports the result. Use a file reference, documentation link, exact command, or observed test result.
 
-- `scope: "portable"` (generalizable)
-- `shareable: true` only if it contains no secrets/PII/project-only context
+Distinguish observations from assumptions. For example, one successful response does not prove that all requests succeed. One `403` response does not identify every possible cause of access failure.
 
-If it’s only relevant to the current repo/run, keep:
+Keep conditions that can change the result. These conditions can include a software version, account permissions, environment, or input format.
 
-- `scope: "project"`
+## Describe the action
 
-## 3) Specific and actionable
-It includes concrete steps:
-- commands, query templates, jq filters, SQL snippets
-- schema/contract summaries (field names + types + invariants)
-- a small checklist that can be followed without extra context
+Give the reader enough information to repeat the procedure. Use commands, field names, or a short sequence of steps.
 
-Avoid vague advice.
+Do not replace a clear procedure with general advice. For example, "be careful with dates" does not identify an action. "Parse the timestamp as UTC before conversion" identifies an action and a condition.
 
-## 4) Safe to store
-No secrets, PII, or proprietary payloads.
+## Select scope
 
-If in doubt:
-- store only the **shape** (field names/types), not raw values
-- store a **redacted** example with placeholders
+Use `project` when the result depends on this repository. Use `portable` when the result is applicable to other projects.
 
----
+To prepare portable content, replace project values with placeholders. Keep the technical conditions that affect correctness. Refer to [portability](PORTABILITY.md) before you copy a card elsewhere.
 
-## Common “aha” categories (good candidates)
+## Keep private data out
 
-### Input/Output shape
-- “Upstream JSON fields are X/Y/Z; `errorCode` is missing when success”
-- “CSV columns are stable; dates are `YYYY-MM-DD`”
+Do not store credentials, personal data, or private payloads. Use field names, types, and synthetic examples when actual values are unnecessary.
 
-### Fast path / template
-- “Best log-search query starter for service logs”
-- “curl invocation with required headers and pagination”
+Automatic redaction can miss secrets. `shareable: false` is a content classification, not access control.
 
-### Invariants and constraints
-- “This endpoint requires idempotency key”
-- “Times are UTC; convert before charting”
+## Avoid duplicate records
 
-### Error signatures → fixes
-- “`403` means token missing scope; fix by …”
-- “`jq` fails unless we use `-r`”
+Search for an existing card before you add the same result again. Add new source data when it changes the card's value. Record actual use with a signal.
 
-### Tooling shortcuts
-- “Use `rg` with these patterns; ignore vendor dirs”
-- “Use `git log -S` for this kind of regression”
+Do not add signals only to increase a score. Do not convert a repeated assumption into a fact.
 
-### Negative knowledge (anti-patterns)
-Record things that failed if the failure was non-obvious (so future runs don’t waste time retrying known bad paths).
+## Separate results from proposals
 
-- “Do not use `git grep` on this repo; it hangs. Use `rg`.”
-- “The v2 API endpoint returns `200 OK` even on errors; check the body.”
+An Aha Card records a result. A recommendation proposes a change.
 
----
-
-## What *not* to record
-
-- personal reminders (“be careful”, “remember to check”)
-- long raw logs or payload dumps
-- anything that depends on ephemeral state
-- anything secret / sensitive
+State the expected benefit as an estimate until measurements support it. Do not report an untested proposal as a completed improvement.

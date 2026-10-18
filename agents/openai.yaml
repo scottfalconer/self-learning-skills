@@ -1,0 +1,4 @@
+interface:
+  display_name: "Self-learning skills"
+  short_description: "Find and record results from work in a project"
+  default_prompt: "Use $self-learning-skills to find related project records. Save useful results from this task."
