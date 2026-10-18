@@ -1,0 +1,2 @@
+# Required only for tests of skill metadata. The CLI uses the standard library.
+PyYAML==6.0.3

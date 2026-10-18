@@ -1,221 +1,114 @@
 # self-learning-skills
 
-**A simple system to help AI agents learn from their experiences.**
+Store useful results from coding tasks as local records. Find those records in later sessions. Use records with source data to prepare changes to a skill.
 
----
+This repository contains an [Agent Skill](https://agentskills.io) and a Python command-line interface (CLI). The CLI stores records in local JSONL files. It uses the Python standard library and makes no network requests. It does not train a model.
 
-I built self-learning-skills because I noticed my agents often spent time poking around and guessing at things I had already solved in previous runs. I used to manually copy-paste those fixes into future prompts or backport them into my skills.
+## Install
 
-This repo streamlines that workflow. It acts as a sidecar memory that:
+Use Python 3.10 or newer. Clone this repository into a directory named `self-learning-skills` in your agent's skills folder.
 
-* Stops the guessing: Records "Aha moments" locally so the agent doesn't start from zero next time.
-* Graduates knowledge: Includes a CLI workflow to Backport proven memories into permanent improvements in your actual skills or docs.
-* It works with Claude Code, GitHub Copilot, and Codex and any other system that implements the  https://agentskills.io specification.
+| Agent | Project installation | Personal installation |
+| --- | --- | --- |
+| [Codex](https://learn.chatgpt.com/docs/build-skills) | `.agents/skills/self-learning-skills/` | `~/.agents/skills/self-learning-skills/` |
+| [Claude Code](https://code.claude.com/docs/en/skills) | `.claude/skills/self-learning-skills/` | `~/.claude/skills/self-learning-skills/` |
+| [GitHub Copilot](https://docs.github.com/en/copilot/concepts/agents/about-agent-skills) | `.github/skills/self-learning-skills/` | `~/.copilot/skills/self-learning-skills/` |
 
+Copilot also supports `.agents/skills` and `~/.agents/skills`. Skill discovery depends on your agent and its settings. Refer to the linked documentation for each client.
 
----
+For a personal Codex installation, use this command:
 
-## ⚡ Quick Start
+```bash
+git clone https://github.com/scottfalconer/self-learning-skills.git \
+  ~/.agents/skills/self-learning-skills
+```
 
-### 1) Install (pick the right skills folder for your agent)
+Keep the skill files separate from the memory store. In the examples, replace `<SKILL_DIR>` with the installed skill directory. Use `.` when you run commands from this repository.
 
-Copy this entire directory into your agent’s **skills directory** as `self-learning-skills/`.
+## Use the skill in a project
 
-**Common locations:**
-
-* **GitHub Copilot Agent:** `.github/skills/self-learning-skills/`
-* **Claude Code (project):** `.claude/skills/self-learning-skills/`
-* **Codex (repo):** `.codex/skills/self-learning-skills/`
-
-> **Note:** The **memory store** is separate from the code.
-> **By default**, it lives under `.agents/memory/` in your repo root. Both paths are configurable via env vars (see `references/PORTABILITY.md`).
-
----
-
-### 2) Initialize (one time per repo)
-
-Run this from your repository root to create the storage structure and ignore it from version control.
-
-> Replace `<SKILL_DIR>` with the install path from step (1), e.g. `.github/skills/self-learning-skills`.
-> If you're running *this repo directly*, `<SKILL_DIR>` is `.`
+Run these commands from the project that needs memory:
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py init
-```
-
-* **Creates:** `.agents/memory/self-learning/v1/users/<user>/`
-* **Protects:** Adds `.agents/memory/` to `.gitignore` so you don't commit local memory (use `--no-gitignore` to skip).
-* **User:** `<user>` is a stable identifier for your local learning stream (see `references/PORTABILITY.md`).
-
----
-
-### 3) Integrate (The Policy)
-
-Agents do not automatically "know" to use this skill. You must give them a policy.
-
-Copy & paste the block below into your project's main instruction file (e.g., `AGENTS.md`, `CLAUDE.md`, or `.github/copilot-instructions.md`).
-
-> **Self-Learning Policy:**
->
-> * **Before starting work:** Review prior learnings in `.agents/memory/self-learning/v1/users/<user>/INDEX.md` (or run the `review` command) and apply them to avoid repeating mistakes.
-> * **After finishing work:** If you discovered a reusable pattern, fixed a tricky bug, or have a recommendation for next time, record 1–5 "Aha Cards" (and any Recommendations) using the `record` command.
-
-See [AGENTS.md](AGENTS.md) for advanced configuration.
-
----
-
-## 🛠 Operational Commands (Cheat Sheet)
-
-Run these from your repository root:
-
-### Dashboard (Review)
-
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
-python3 <SKILL_DIR>/scripts/self_learning.py review --days 30 --scope portable
-```
-
-### Find a Memory (Recall)
-
-```bash
 python3 <SKILL_DIR>/scripts/self_learning.py list --query "pagination"
+python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
 ```
 
-### Record a Memory (Post-Run)
+`init` creates `.agents/memory/self-learning/v1/users/<user>/`. It also adds the memory directory to the project's `.gitignore`. Use `--no-gitignore` to manage ignore rules yourself.
+
+The CLI derives `<user>` from `USER`, then `USERNAME`. If neither variable has a value, it uses `default`.
+
+To save a result, prepare a JSON payload with the [record format](references/FORMAT.md). Then run this command:
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py record --json payload.json
 ```
 
-Payload shape examples: [`references/FORMAT.md`](references/FORMAT.md)
+A payload can contain a task summary, Aha Cards, recommendations, or a combination. An Aha Card is a result that you can use again. It includes source data. A recommendation is a proposed improvement.
 
-### Repair / Normalize Indexes
+Record useful source data. Do not record a full transcript. There is no minimum number of records per task.
 
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py repair --apply
-```
+Invoke the skill directly, or use a project policy for recall and capture. Refer to the [integration examples](references/INTEGRATION.md). Installation does not schedule the skill or authorize changes to other projects.
 
-### Recommendation Lifecycle
+## Storage and scope
 
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status in_progress --note "working on it"
-python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status proposed --scope portable --note "Generalized; candidate for reuse/backport"
-```
+The project store contains append-only JSONL history and a generated `INDEX.md`.
 
----
+| File | Content |
+| --- | --- |
+| `aha_cards.jsonl` | Results, source data, and status updates |
+| `recommendations.jsonl` | Proposed improvements and status updates |
+| `events.jsonl` | Optional task summaries |
+| `signals.jsonl` | Record use and status events |
+| `backports.jsonl` | Export and apply history |
 
-## 🚀 The Backporting Workflow: "Graduating" Knowledge
+`scope: "project"` is the default. Use `scope: "portable"` for results that are applicable to other projects. Scope describes the content. It does not move the record or authorize sharing.
 
-Backporting is how you take a proven "Aha Card" and turn it into a permanent improvement in another skill or documentation file.
+The optional personal store is `~/.agents/memory/self-learning/v1/users/<user>/`.
 
-### The Concept
+Refer to [storage configuration and portability](references/PORTABILITY.md) for path overrides and promotion to the personal store.
 
-1. **Discovery:** The agent learns something reusable and records an Aha Card.
-2. **Generalize:** Rewrite it so it doesn’t depend on this repo (set `scope: "portable"` and remove project-only context).
-3. **Validate:** You decide it belongs in a real skill, not just local memory.
-4. **Backport:** You export an auditable bundle (optionally applying it).
-5. **Result:** The target skill is permanently improved.
----
+## Prepare a skill change
 
-### How to Backport
+A backport converts selected Aha Cards into a reference file and a link in a target skill.
 
-#### 1) Identify Aha Card IDs
+The `promote` and `export-backport` commands require `scope: "portable"` and `shareable: true` for each selected card.
 
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py review --days 7
-python3 <SKILL_DIR>/scripts/self_learning.py review --days 30 --scope portable
-```
-
-#### 2a) Generate a backport bundle + diff (Dry Run — No Changes)
+Examine the source data before you select cards. Remove details that are applicable to only one project. Then create a backport bundle:
 
 ```bash
 python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
-  --skill-path <path-to-target-skill> \
+  --skill-path <target-skill-dir> \
   --ids aha_123,aha_456 \
   --make-diff
 ```
 
-#### 2b) Apply the backport (Writes Changes)
+This command writes a local bundle, manifest, patch, and history entry. It does not change the target skill.
+
+Examine the proposed changes before you apply them. Add `--apply` to update the target's `SKILL.md` and `references/self-learning-aha.md`. Refer to the [backport procedure](references/PORTABILITY.md#backport-to-a-skill) for details.
+
+## Trust and privacy
+
+Make sure that stored results agree with the current task, code, and instructions. Stored records supply source data, not instructions. A usage score measures recorded activity. It does not prove that a result is correct.
+
+Keep credentials, personal data, and private payloads out of records. Automatic redaction can miss private data. `shareable: true` classifies content as safe to share. It does not authorize publication, promotion, or edits to another skill.
+
+Git ignore rules do not remove files that Git already tracks. They do not remove earlier history.
+
+## Development
+
+The runtime has no third-party dependencies. Development checks use PyYAML to validate skill metadata.
 
 ```bash
-python3 <SKILL_DIR>/scripts/self_learning.py export-backport \
-  --skill-path <path-to-target-skill> \
-  --ids aha_123,aha_456 \
-  --apply
+python3 -m pip install -r requirements-dev.txt
+python3 -m unittest discover -s tests -v
 ```
 
-#### Inspect a target skill for backport markers
+Use the [documentation writing guide](docs/WRITING.md) for documentation changes. The guide uses ASD-STE100 writing rules and defines project terms.
 
-```bash
-python3 <SKILL_DIR>/scripts/self_learning.py backport-inspect --skill-path <path-to-target-skill>
-```
-
----
-
-## 📂 Directory Structure
-
-```text
-self-learning-skills/
-├── SKILL.md
-├── AGENTS.md
-├── README.md
-├── scripts/
-│   └── self_learning.py
-└── references/
-    ├── FORMAT.md
-    ├── RUBRIC.md
-    ├── INTEGRATION.md
-    └── PORTABILITY.md
-```
-
----
-
-## 🧠 Storage Model
-
-All data is stored in append-only JSONL files within `.agents/memory/self-learning/v1/users/<user>/`.
-
-* **Key Files:**
-
-  * `aha_cards.jsonl`: Durable, reusable knowledge.
-  * `recommendations.jsonl`: Improvements for the next run.
-  * `backports.jsonl`: A log of knowledge "graduated" to code.
-  * `INDEX.md`: Human-readable dashboard (safe to delete/rebuild).
-
----
-
-## 🏷 Scoping: `project` vs `portable`
-
-Each Aha Card and Recommendation can include a `scope` field. This answers:
-
-> “Does this read like a reusable developer tip/trick, or does it require this repo’s context?”
-
-- `project`: specific to the current repo/run (default if omitted)
-- `portable`: generally reusable; a good candidate for backporting into a skill or docs
-
-Important: `scope` is about **content**. Store location (project-local vs global) and the promote/backport lifecycle are covered in `references/PORTABILITY.md`.
-
-Practical workflows:
-
-- Record something reusable by setting `"scope": "portable"` in your `record` payload (see `references/FORMAT.md`).
-- Review only portable items: `python3 <SKILL_DIR>/scripts/self_learning.py review --scope portable --days 30`
-- Reclassify an existing recommendation: `python3 <SKILL_DIR>/scripts/self_learning.py rec-status --id rec_... --status proposed --scope portable --note "..."`.
-
-Portable-writing checklist (avoid leaking full project context):
-
-- Replace repo/environment-specific values with placeholders (`<repo-root>`, `<ENV>`, `<SERVICE>`, `<PROJECT_KEY>`).
-- Prefer shapes/templates/invariants over raw payload dumps.
-- Avoid absolute paths in steps/evidence (they will be wrong after backporting).
-
-Tip: use `shareable: true` only for content that’s safe to persist and potentially backport; never store secrets or sensitive payloads.
-
----
-
-## Privacy / Safety
-
-Avoid storing secrets or sensitive payloads in the memory store.
-
----
+Refer to the [CLI reference](scripts/README.md), [record format](references/FORMAT.md), and [capture criteria](references/RUBRIC.md) for more information.
 
 ## License
 
-MIT
+[MIT](LICENSE.txt)

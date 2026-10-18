@@ -1,187 +1,144 @@
-# Self-Learning Storage Format (v1)
+# Record format
 
-This skill writes **append-only JSONL** files.
+The CLI stores version 1 records in JSONL files. Each line contains one JSON object. Refer to [storage configuration](PORTABILITY.md) for directory paths.
 
-## Default store locations
+## Record input
 
-### Project-local (recommended)
-`<repo-root>/.agents/memory/self-learning/v1/users/<user>/`
+The `record` command accepts a JSON object from a file or standard input. Each top-level field is optional.
 
-### Global (optional)
-`~/.agents/memory/self-learning/v1/users/<user>/`
+| Field | Type | Content |
+| --- | --- | --- |
+| `event` | Object | A task summary |
+| `aha_cards` | Array of objects | Results that can help later tasks |
+| `recommendations` | Array of objects | Proposed improvements |
+| `used_aha_ids` | Array of strings | IDs of cards that informed the task |
+| `used_rec_ids` | Array of strings | IDs of recommendations that informed the task |
+| `usage_source` | String | The source of usage signals |
+| `usage_context` | String | A short description of record use |
 
-The helper script (`<SKILL_DIR>/scripts/self_learning.py`) supports both.
+This example shows a payload. It does not report a test of this repository.
 
-## Files
+```json
+{
+  "event": {
+    "task_summary": "Correct the CSV import",
+    "primary_skill": "csv-import"
+  },
+  "aha_cards": [
+    {
+      "title": "Preserve empty CSV fields",
+      "when_to_use": "Import rows with optional CSV fields",
+      "problem": "A split on commas cannot read quoted commas correctly.",
+      "solution_steps": [
+        "Use the csv module to read rows.",
+        "Keep empty field values until validation."
+      ],
+      "evidence": ["tests/test_csv_import.py"],
+      "primary_skill": "csv-import",
+      "scope": "project",
+      "shareable": false,
+      "tags": ["csv", "import"]
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Add a quoted-field test",
+      "why": "A test can detect changes to the import behavior.",
+      "expected_impact": {"quality": "high"},
+      "implementation_hint": "Add an empty field and a quoted comma to the import test data.",
+      "primary_skill": "csv-import",
+      "scope": "project",
+      "shareable": false,
+      "status": "proposed",
+      "tags": ["tests"]
+    }
+  ]
+}
+```
 
-- `events.jsonl` — what happened in runs
-- `aha_cards.jsonl` — the durable “aha moments” captured
-- `recommendations.jsonl` — improvement opportunities (what would make next time easier)
-- `backports.jsonl` — provenance log for backport bundles/actions
-- `signals.jsonl` — lightweight “usage”/lifecycle signals for scoring
-- `INDEX.md` — optional human-readable summary (best-effort)
+Save the payload as `payload.json`. Then run this command:
 
-All JSONL files are **append-only**.
+```bash
+python3 <SKILL_DIR>/scripts/self_learning.py record --json payload.json
+```
 
-### Append-only updates (auditable)
-
-Some JSONL files behave like an **event stream**:
-
-- `aha_cards.jsonl`: you may append a new line with an existing `id` to update status/fields (history is preserved).
-- `recommendations.jsonl`: you may append a new line with an existing `id` to update status/notes (history is preserved).
+Without `--json`, the command reads JSON from standard input. Input validation rejects malformed known fields before it writes records.
 
 ## Common fields
 
-- `id` (string): stable identifier. If omitted, the helper script will create one.
-- `ts` (string): ISO 8601 timestamp (`YYYY-MM-DDTHH:MM:SSZ`). If omitted, helper script fills it.
-- `primary_skill` (string): the skill name involved (use `unknown` if not known)
-- `scope` (string): `project` (repo/run-specific; not a backport target) or `portable` (generally reusable; a backport candidate)
-- `shareable` (boolean): whether it is safe to backport/share
-- `tags` (array of strings): small keywords (`["schema", "jq"]`). Optional convention: include `skill:<name>` to explicitly tag the originating skill (used by `python3 <SKILL_DIR>/scripts/self_learning.py repair` to backfill missing `primary_skill`).
+| Field | Meaning |
+| --- | --- |
+| `id` | A stable record ID. The CLI creates it if you omit it. |
+| `ts` | An ISO 8601 timestamp. The CLI supplies UTC time if you omit it. |
+| `primary_skill` | The related skill name. The CLI uses `unknown` when it cannot determine the name. |
+| `scope` | `project` by default, or `portable` for content that applies to other projects. |
+| `shareable` | A boolean content classification. Set it to `true` only after a privacy examination. |
+| `tags` | An array of search terms. `skill:<name>` can identify the related skill. |
 
-### Writing `portable` entries (generalize without project bleed)
+The CLI accepts additional fields. Their presence does not prove that their content is correct. Prefer fields that help another reader examine or use the result.
 
-If you set `scope: "portable"`, write the card/recommendation so it reads like a reusable developer note:
+For portable records, use placeholders for project values. Keep credentials, personal data, and private payloads out of every record. `shareable: false` does not make secret storage safe.
 
-- Replace project-specific values with placeholders: `<repo-root>`, `<ENV>`, `<SERVICE>`, `<PROJECT_KEY>`, `<TOKEN>`.
-- Prefer **templates and shapes** over raw payload dumps (field names/types, invariants, error signatures).
-- Avoid absolute paths in `solution_steps`/`evidence` (they will be wrong after backporting).
-- If it’s portable in spirit but still sensitive, keep `scope: "portable"` but set `shareable: false` until you can rewrite safely.
+## Aha Cards
 
-## Aha Card object (one per line in `aha_cards.jsonl`)
+An Aha Card explains a result and the conditions for its use. Include `title`, `when_to_use`, `problem`, `solution_steps`, and `evidence`.
 
-Required (minimum viable):
+The `evidence` field contains source references or observed results. Include an exact command and its result when you report a test. Identify conditions that limit the result, such as a software version or environment.
 
-```json
-{
-  "id": "aha_...",
-  "ts": "2025-12-26T18:22:10Z",
-  "title": "Short, specific title",
-  "when_to_use": "Keywords / trigger phrase",
-  "problem": "What slowed us down or caused uncertainty",
-  "solution_steps": ["Step 1", "Step 2"],
-  "evidence": ["path/to/file.md", "command: jq ..."],
-  "primary_skill": "skill-name-or-unknown",
-  "scope": "project",
-  "shareable": true,
-  "tags": ["tag1", "tag2"]
-}
-```
+Optional fields include `input_shape`, `output_shape`, `gotchas`, `links`, and `note`. Keep these fields short.
 
-Recommended extra fields:
+The permitted status values are `proposed`, `accepted`, `rejected`, `deprecated`, and `backported`.
 
-- `input_shape` (object): schema-like summary of key fields
-- `output_shape` (object): shape of produced artifacts
-- `gotchas` (array of strings)
-- `links` (array of strings): internal links / docs (avoid secrets)
-- `status` (string): `proposed|accepted|rejected|deprecated|backported` (optional)
-- `last_touched_ts` (string): ISO timestamp for last manual status/note change (optional)
-- `note` (string): optional human note for the latest status change
+The CLI uses a card's title, use condition, and primary skill to find equivalent cards. A repeated record can add source data and a reinforcement signal.
 
-## Recommendation object (one per line in `recommendations.jsonl`)
+A repeated record can restrict sharing. It cannot change a private card to a shareable card. To share revised content, create a new card with a different title and ID.
 
-Required (minimum viable):
+## Recommendations
 
-```json
-{
-  "id": "rec_...",
-  "ts": "2025-12-26T18:22:10Z",
-  "title": "Concrete improvement",
-  "why": "Why this matters / impact",
-  "expected_impact": { "speed": "high", "quality": "medium" },
-  "implementation_hint": "What to add/change and where",
-  "primary_skill": "skill-name-or-unknown",
-  "scope": "project",
-  "shareable": true,
-  "status": "proposed",
-  "last_touched_ts": "2025-12-26T18:22:10Z",
-  "note": "Optional note about status change",
-  "tags": ["docs", "schema"]
-}
-```
+A recommendation identifies a proposed change. Include `title`, `why`, and `implementation_hint`.
 
-Optional backport hints:
+`expected_impact` can contain `speed` and `quality` values. These values are estimates, not measured results. `last_touched_ts` identifies the last status change. `note` can explain that change.
 
-```json
-{
-  "backport": {
-    "type": "reference-file",
-    "target_skill_path": "optional/path/to/skill",
-    "files": [
-      { "path": "references/upstream-schema.md", "content": "# Schema\n..." }
-    ],
-    "skill_md_append": "## Notes\nRead references/upstream-schema.md first."
-  }
-}
-```
+The permitted status values are `proposed`, `accepted`, `in_progress`, `done`, `rejected`, and `deprecated`.
 
-## Event object (one per line in `events.jsonl`)
+## Files and history
 
-Minimum viable:
+| File | Content |
+| --- | --- |
+| `events.jsonl` | Task summaries |
+| `aha_cards.jsonl` | Aha Card history |
+| `recommendations.jsonl` | Recommendation history |
+| `signals.jsonl` | Usage and status signals |
+| `backports.jsonl` | Export and apply history |
+| `INDEX.md` | A generated summary of the store |
 
-```json
-{
-  "id": "evt_...",
-  "ts": "2025-12-26T18:22:10Z",
-  "task_summary": "What the user wanted",
-  "primary_skill": "skill-name-if-known",
-  "notes": ["Key steps taken", "Tools used", "Pain points"]
-}
-```
+JSONL updates add records. For a repeated ID, the last record supplies its current state. Earlier records remain in the file. `INDEX.md` can change when the CLI writes records or applies repairs.
 
-## Backport record object (one per line in `backports.jsonl`)
+Use the CLI status commands to change a record. Do not remove history to change its status.
 
-Minimum viable:
+Use only one writer per store. The CLI has no lock or transaction across files. An interrupted write can leave an incomplete operation.
 
-```json
-{
-  "ts": "2025-12-26T18:22:10Z",
-  "backport_id": "slbp_20251226T182210Z_4f2c9c",
-  "target_skill": "example-skill",
-  "target_skill_path": "/path/to/skill",
-  "requested_card_ids": ["aha_..."],
-  "added_card_ids": ["aha_..."],
-  "result_card_ids": ["aha_..."],
-  "applied": true,
-  "bundle_dir": "/path/to/.agents/memory/.../exports/backports/example-skill_slbp_..."
-}
-```
+## Usage signals
 
-## Signal record object (one per line in `signals.jsonl`)
+Signals contain `ts`, `kind`, a related record ID, `source`, and optional `context`.
 
-Signals are lightweight, append-only events used for scoring and lifecycle tracking.
-
-Minimum viable:
-
-```json
-{
-  "ts": "2025-12-26T18:22:10Z",
-  "kind": "aha_used",
-  "aha_id": "aha_...",
-  "source": "manual",
-  "context": "Short, non-sensitive context"
-}
-```
-
-`kind` values (current):
+The permitted signal kinds are:
 
 - `aha_used`, `aha_recalled`, `aha_reinforced`, `aha_promoted`, `aha_backported`
 - `rec_used`, `rec_touched`, `rec_done`
 
-Helper CLI conveniences:
+To record actual use, run this command:
 
-- `python3 <SKILL_DIR>/scripts/self_learning.py use --aha aha_...[,aha_...] [--rec rec_...[,rec_...]]` appends `aha_used` / `rec_used` signals.
-- `python3 <SKILL_DIR>/scripts/self_learning.py record` also supports optional keys to auto-append usage signals:
-  - `used_aha_ids`: array of `aha_...` ids (or comma-separated string)
-  - `used_rec_ids`: array of `rec_...` ids (or comma-separated string)
-  - `used`: `{ "aha_ids": [...], "rec_ids": [...] }` (alternative shape)
-  - `usage_source`, `usage_context`: optional metadata for the generated signals
+```bash
+python3 <SKILL_DIR>/scripts/self_learning.py use --aha aha_123 --rec rec_123
+```
 
-## Redaction and safety
+The `record` payload also accepts `used: {"aha_ids": [...], "rec_ids": [...]}`. This field is an alternative to `used_aha_ids` and `used_rec_ids`.
 
-Never store:
-- credentials, API keys, tokens, cookies
-- private user data (PII)
-- proprietary payloads that shouldn’t persist
+Usage scores help sort records. They do not establish correctness or permission to share content.
 
-The helper script performs **best-effort redaction** based on key names and token-like patterns, but the agent should still avoid capturing sensitive data.
+## Redaction limits
+
+The CLI masks some secret fields and token patterns. It cannot identify all private data.
+
+Remove private data before you prepare a payload. Examine the stored result after an authorized write. Append-only history keeps earlier values, even when you add a corrected record.

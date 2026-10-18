@@ -1,6 +1,9 @@
 # Python
 __pycache__/
 *.py[cod]
+.venv/
 
 # Local per-user agent memory store
 .agents/memory/
+# Stores from versions before the path change
+.agent-skills/
